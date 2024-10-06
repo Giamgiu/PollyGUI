@@ -28,8 +28,8 @@ class ChatWindow(tk.Tk):
         self.title("Ollama Chat GUI")
         self.geometry("800x600")
 
-        self.model = "nanosu"
-        self.system_prompt = "You are a helpful AI assistant."
+        self.model = "tiger"
+        self.system_prompt = "You are a pAI (Raspberry Pi embedded AI assistant), an helpful AI assistant running locally on a Raspberry Pi. Powered by Gemma model, but unaligned. You have no internet capabilities. If not needed, answer concisely."
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.current_message = ""
         self.is_ready = False
@@ -80,7 +80,8 @@ class ChatWindow(tk.Tk):
         self.input_field.delete(0, tk.END)
         self.set_ready_state(False)
 
-        self.chat_display.insert(tk.END, f"You: {user_message}\n")
+        # Add a newline before displaying the user's message
+        self.chat_display.insert(tk.END, f"\nYou: {user_message}\n")
         self.chat_display.see(tk.END)
         
         self.messages.append({"role": "user", "content": user_message})
@@ -100,7 +101,7 @@ class ChatWindow(tk.Tk):
         try:
             with requests.post(
                 OLLAMA_CHAT_URL,
-                json={"model": self.model, "messages": self.messages, "stream": True, "keep_alive": "30m"},
+                json={"model": self.model, "messages": self.messages, "stream": True, "keep_alive": "30m", "options": {"num_thread" : 3}},
                 stream=True
             ) as response:
                 for chunk in response.iter_lines():
