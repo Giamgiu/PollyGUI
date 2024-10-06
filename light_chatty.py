@@ -235,10 +235,30 @@ class ChatWindow(tk.Tk):
             self.chat_display.see(tk.END)
 
     def load_history(self):
-        filename = simpledialog.askstring("Load Chat History", "Enter the filename to load:")
-        if filename:
-            filepath = os.path.join(CHAT_HISTORY_FOLDER, f"{filename}.json")
-            if os.path.exists(filepath):
+        # Get list of saved chat history files
+        saved_files = [f for f in os.listdir(CHAT_HISTORY_FOLDER) if f.endswith('.json')]
+        
+        if not saved_files:
+            messagebox.showinfo("No Saved Histories", "No saved chat histories found.")
+            return
+
+        # Create a new top-level window
+        select_window = tk.Toplevel(self)
+        select_window.title("Select Chat History")
+        select_window.geometry("300x300")
+
+        # Create a listbox with saved files
+        listbox = tk.Listbox(select_window)
+        listbox.pack(expand=True, fill='both', padx=10, pady=10)
+
+        for file in saved_files:
+            listbox.insert(tk.END, file)
+
+        def on_select():
+            selection = listbox.curselection()
+            if selection:
+                selected_file = listbox.get(selection[0])
+                filepath = os.path.join(CHAT_HISTORY_FOLDER, selected_file)
                 with open(filepath, 'r') as f:
                     data = json.load(f)
                     self.messages = data.get("messages", [])
@@ -255,8 +275,30 @@ class ChatWindow(tk.Tk):
                 self.chat_display.insert(tk.END, f"System prompt: {self.system_prompt}\n")
                 self.chat_display.insert(tk.END, f"Model: {self.model}\n")
                 self.chat_display.see(tk.END)
-            else:
-                messagebox.showerror("Error", f"File not found: {filepath}")
+                select_window.destroy()
+
+        def on_delete():
+            selection = listbox.curselection()
+            if selection:
+                selected_file = listbox.get(selection[0])
+                filepath = os.path.join(CHAT_HISTORY_FOLDER, selected_file)
+                if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {selected_file}?"):
+                    os.remove(filepath)
+                    listbox.delete(selection)
+                    self.chat_display.insert(tk.END, f"\nDeleted chat history: {selected_file}\n")
+                    self.chat_display.see(tk.END)
+
+        # Add buttons frame
+        buttons_frame = ttk.Frame(select_window)
+        buttons_frame.pack(pady=10)
+
+        # Add a select button
+        select_button = ttk.Button(buttons_frame, text="Load", command=on_select)
+        select_button.pack(side='left', padx=5)
+
+        # Add a delete button
+        delete_button = ttk.Button(buttons_frame, text="Delete", command=on_delete)
+        delete_button.pack(side='left', padx=5)
 
     def change_model(self):
         new_model = simpledialog.askstring("Change Model", "Enter new model name:")

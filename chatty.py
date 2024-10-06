@@ -90,9 +90,12 @@ class ChatHistoryDialog(QDialog):
         button_layout = QHBoxLayout()
         load_button = QPushButton("Load")
         load_button.clicked.connect(self.accept)
+        delete_button = QPushButton("Delete")
+        delete_button.clicked.connect(self.delete_selected)
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(load_button)
+        button_layout.addWidget(delete_button)
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
         
@@ -107,6 +110,21 @@ class ChatHistoryDialog(QDialog):
         if self.list_widget.currentItem():
             return os.path.join(CHAT_HISTORY_FOLDER, self.list_widget.currentItem().text())
         return None
+
+    def delete_selected(self):
+        if self.list_widget.currentItem():
+            file_path = self.get_selected_file()
+            reply = QMessageBox.question(self, 'Delete Confirmation',
+                                         f"Are you sure you want to delete {self.list_widget.currentItem().text()}?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                         QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    os.remove(file_path)
+                    self.list_widget.takeItem(self.list_widget.row(self.list_widget.currentItem()))
+                    QMessageBox.information(self, "Success", "File deleted successfully.")
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to delete file: {str(e)}")
 
 class PreloadWorker(QObject):
     finished = pyqtSignal()
@@ -153,6 +171,62 @@ class ChatWindow(QMainWindow):
 
         # Use a timer to start the Ollama check and preload after the event loop starts
         QTimer.singleShot(0, self.initialize_ollama)
+
+    def setup_ui(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+
+        self.chat_display = QTextEdit()
+        self.chat_display.setReadOnly(True)
+        
+        font = QFont("Ubuntu", 16)
+        self.chat_display.setFont(font)
+        
+        layout.addWidget(self.chat_display)
+
+        input_layout = QHBoxLayout()
+        self.input_field = QLineEdit()
+        self.input_field.setFont(QFont("Ubuntu", 14))
+        self.input_field.returnPressed.connect(self.send_message)
+        input_layout.addWidget(self.input_field)
+
+        self.send_button = QPushButton("Send")
+        self.send_button.clicked.connect(self.send_message)
+        input_layout.addWidget(self.send_button)
+
+        stop_model_button = QPushButton("Stop Model")
+        stop_model_button.clicked.connect(self.stop_model)
+        input_layout.addWidget(stop_model_button)
+
+        layout.addLayout(input_layout)
+        button_layout = QHBoxLayout()
+        
+        modify_system_prompt_button = QPushButton("Modify System Prompt")
+        modify_system_prompt_button.clicked.connect(self.modify_system_prompt)
+        button_layout.addWidget(modify_system_prompt_button)
+
+        save_history_button = QPushButton("Save History")
+        save_history_button.clicked.connect(self.save_history)
+        button_layout.addWidget(save_history_button)
+
+        load_history_button = QPushButton("Load History")
+        load_history_button.clicked.connect(self.load_history)
+        button_layout.addWidget(load_history_button)
+
+        change_model_button = QPushButton("Change Model")
+        change_model_button.clicked.connect(self.change_model)
+        button_layout.addWidget(change_model_button)
+
+        clear_history_button = QPushButton("Clear History")
+        clear_history_button.clicked.connect(self.clear_history)
+        button_layout.addWidget(clear_history_button)
+
+        unload_model_button = QPushButton("Unload Model")
+        unload_model_button.clicked.connect(self.unload_model)
+        button_layout.addWidget(unload_model_button)
+
+        layout.addLayout(button_layout)
 
     def initialize_ollama(self):
         self.check_ollama()
@@ -208,59 +282,6 @@ class ChatWindow(QMainWindow):
         event.accept()
 
 
-    def setup_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-
-        self.chat_display = QTextEdit()
-        self.chat_display.setReadOnly(True)
-        
-        # Set font to Ubuntu and increase size
-        font = QFont("Ubuntu", 16)
-        self.chat_display.setFont(font)
-        
-        layout.addWidget(self.chat_display)
-
-        input_layout = QHBoxLayout()
-        self.input_field = QLineEdit()
-        self.input_field.setFont(QFont("Ubuntu", 14))  # Increase input text size
-        self.input_field.returnPressed.connect(self.send_message)
-        input_layout.addWidget(self.input_field)
-
-        self.send_button = QPushButton("Send")
-        self.send_button.clicked.connect(self.send_message)
-        input_layout.addWidget(self.send_button)
-
-        stop_model_button = QPushButton("Stop Model")
-        stop_model_button.clicked.connect(self.stop_model)
-        input_layout.addWidget(stop_model_button)
-
-        layout.addLayout(input_layout)
-        button_layout = QHBoxLayout()
-        
-        modify_system_prompt_button = QPushButton("Modify System Prompt")
-        modify_system_prompt_button.clicked.connect(self.modify_system_prompt)
-        button_layout.addWidget(modify_system_prompt_button)
-
-        save_history_button = QPushButton("Save History")
-        save_history_button.clicked.connect(self.save_history)
-        button_layout.addWidget(save_history_button)
-
-        load_history_button = QPushButton("Load History")
-        load_history_button.clicked.connect(self.load_history)
-        button_layout.addWidget(load_history_button)
-
-        change_model_button = QPushButton("Change Model")
-        change_model_button.clicked.connect(self.change_model)
-        button_layout.addWidget(change_model_button)
-
-        # Add Clear History button
-        clear_history_button = QPushButton("Clear History")
-        clear_history_button.clicked.connect(self.clear_history)
-        button_layout.addWidget(clear_history_button)
-
-        layout.addLayout(button_layout)
 
     def send_message(self):
         if not self.is_ready:
@@ -406,6 +427,18 @@ class ChatWindow(QMainWindow):
         self.chat_display.append(f"\nError: {error_message}\n")
         logging.error(f"Error displayed: {error_message}")
 
+    def unload_model(self):
+            try:
+                response = requests.post(OLLAMA_CHAT_URL, json={"model": self.model, "keep_alive": "0"})
+                response.raise_for_status()
+                self.chat_display.setTextColor(QColor("blue"))
+                self.chat_display.append(f"\nModel {self.model} unloaded from RAM.\n")
+                self.chat_display.setTextColor(QColor("black"))
+                logging.debug(f"Model {self.model} unloaded")
+            except requests.RequestException as e:
+                error_msg = f"Error unloading model: {str(e)}"
+                self.show_error(error_msg)
+            self.chat_display.ensureCursorVisible()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
