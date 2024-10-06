@@ -15,7 +15,7 @@ os.makedirs(CHAT_HISTORY_FOLDER, exist_ok=True)
 
 def check_ollama_version():
     try:
-        response = requests.get(OLLAMA_VERSION_URL)
+        response = requests.get(OLLAMA_VERSION_URL, params={"keep_alive": "30m"})
         data = response.json()
         return data.get('version', 'unknown')
     except requests.RequestException as e:
@@ -65,6 +65,7 @@ class ChatWindow(tk.Tk):
         ttk.Button(button_frame, text="Load History", command=self.load_history).pack(side='left', padx=5)
         ttk.Button(button_frame, text="Change Model", command=self.change_model).pack(side='left', padx=5)
         ttk.Button(button_frame, text="Clear History", command=self.clear_history).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Unload Model", command=self.unload_model).pack(side='left', padx=5)
 
         self.status_label = ttk.Label(self, text="Initializing...")
         self.status_label.pack(side='bottom', pady=5)
@@ -76,7 +77,7 @@ class ChatWindow(tk.Tk):
         user_message = self.input_field.get().strip()
         if not user_message:
             return
-        self.input_field.delete(0, tk.END)  # Clear the input field after sending the message
+        self.input_field.delete(0, tk.END)
         self.set_ready_state(False)
 
         self.chat_display.insert(tk.END, f"You: {user_message}\n")
@@ -89,7 +90,7 @@ class ChatWindow(tk.Tk):
         self.status_label.config(text="Processing...")
         self.stop_button.config(state='normal')
 
-        self.stop_event.clear()  # Reset the stop event
+        self.stop_event.clear()
         self.active_thread = threading.Thread(target=self.get_model_response)
         self.active_thread.start()
 
@@ -99,7 +100,7 @@ class ChatWindow(tk.Tk):
         try:
             with requests.post(
                 OLLAMA_CHAT_URL,
-                json={"model": self.model, "messages": self.messages, "stream": True},
+                json={"model": self.model, "messages": self.messages, "stream": True, "keep_alive": "30m"},
                 stream=True
             ) as response:
                 for chunk in response.iter_lines():
@@ -169,7 +170,7 @@ class ChatWindow(tk.Tk):
         
         def preload_thread():
             try:
-                response = requests.post(OLLAMA_CHAT_URL, json={"model": self.model})
+                response = requests.post(OLLAMA_CHAT_URL, json={"model": self.model, "keep_alive": "30m"})
                 response.raise_for_status()
                 self.response_queue.put(('preload_success', None))
             except requests.RequestException as e:
@@ -192,10 +193,10 @@ class ChatWindow(tk.Tk):
 
     def stop_model(self):
         if self.active_thread and self.active_thread.is_alive():
-            self.stop_event.set()  # Signal the thread to stop
+            self.stop_event.set()
             self.chat_display.insert(tk.END, f"\nStopping model: {self.model}\n")
             self.chat_display.see(tk.END)
-            self.active_thread.join(timeout=5)  # Wait for the thread to finish
+            self.active_thread.join(timeout=5)
             if self.active_thread.is_alive():
                 self.chat_display.insert(tk.END, "Failed to stop the model in time.\n")
             else:
@@ -264,6 +265,15 @@ class ChatWindow(tk.Tk):
             self.chat_display.insert(tk.END, f"\nModel changed from {old_model} to {new_model}\n")
             self.chat_display.see(tk.END)
             self.preload_model()
+
+    def unload_model(self):
+        try:
+            response = requests.post(OLLAMA_CHAT_URL, json={"model": self.model, "keep_alive": "0"})
+            response.raise_for_status()
+            self.chat_display.insert(tk.END, f"\nModel {self.model} unloaded from RAM.\n")
+        except requests.RequestException as e:
+            self.show_error(f"Error unloading model: {str(e)}")
+        self.chat_display.see(tk.END)
 
 if __name__ == "__main__":
     window = ChatWindow()
