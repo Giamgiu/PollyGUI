@@ -1,4 +1,4 @@
-# Ollama Chat GUI
+# Ollama Chat GUI - POLLYGUI
 
 This repository contains two Python-based graphical user interfaces for interacting with Ollama, a local large language model runner. The GUIs allow users to chat with Ollama models, manage chat histories, and control various aspects of the model interaction.
 
