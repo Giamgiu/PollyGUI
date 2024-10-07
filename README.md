@@ -7,16 +7,6 @@ This repository contains two Python-based graphical user interfaces for interact
 1. `chatty.py`: A feature-rich GUI built with PyQt6.
 2. `light_chatty.py`: A lightweight GUI built with Tkinter, specifically designed for use on Raspberry Pi.
 
-## Features
-
-Both scripts offer the following features:
-- Chat interface for interacting with Ollama models
-- Ability to change models
-- Modify system prompts
-- Save and load chat histories
-- Clear chat history
-- Unload models from RAM
-- Stop ongoing model responses
 
 ## Requirements
 
@@ -32,7 +22,7 @@ Both scripts offer the following features:
 
 ## Raspberry Pi Compatibility
 
-The `light_chatty.py` script is specifically designed to run on Raspberry Pi. It uses Tkinter, which comes pre-installed with Raspberry Pi OS, making it an ideal choice for lightweight GUI applications on this platform.
+The `light_chatty.py` script is specifically designed to run on Raspberry Pi. It uses Tkinter, which comes pre-installed with Raspberry Pi OS.
 
 ## Installation
 
