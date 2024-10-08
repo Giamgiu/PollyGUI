@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
 OLLAMA_VERSION_URL = f"{OLLAMA_BASE_URL}/api/version"
+OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
 
 # Create a folder for saving chat histories
 CHAT_HISTORY_FOLDER = os.path.join(os.path.expanduser("~"), "ollama_chat_histories")
@@ -156,7 +157,7 @@ class ChatWindow(QMainWindow):
         self.setWindowTitle("Ollama Chat GUI")
         self.setGeometry(100, 100, 800, 600)
 
-        self.model = "hubble"
+        self.model = "llama3.2"
         self.system_prompt = "You are a helpful AI assistant."
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.current_message = ""
@@ -166,11 +167,16 @@ class ChatWindow(QMainWindow):
         self.status_label = QLabel("Initializing...")
         self.statusBar().addPermanentWidget(self.status_label)
 
+        # Add a label to show the current model
+        self.model_label = QLabel(f"Current model: {self.model}")
+        self.statusBar().addPermanentWidget(self.model_label)
+
         self.thread = None
         self.worker = None
 
         # Use a timer to start the Ollama check and preload after the event loop starts
         QTimer.singleShot(0, self.initialize_ollama)
+
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -397,17 +403,64 @@ class ChatWindow(QMainWindow):
         self.chat_display.setTextColor(QColor("black"))
         logging.debug("Chat history cleared")
 
+    def get_available_models(self):
+        try:
+            response = requests.get(OLLAMA_TAGS_URL)
+            response.raise_for_status()
+            data = response.json()
+            return [model['name'] for model in data['models']]
+        except requests.RequestException as e:
+            logging.error(f"Error fetching models: {str(e)}")
+            return []
+        
     def change_model(self):
-        new_model, ok = QInputDialog.getText(self, "Change Model", "Enter new model name:")
-        if ok and new_model:
-            old_model = self.model
-            self.model = new_model
-            self.chat_display.setTextColor(QColor("blue"))
-            self.chat_display.append(f"\nModel changed from {old_model} to {new_model}\n")
+        available_models = self.get_available_models()
+        
+        if not available_models:
+            self.chat_display.setTextColor(QColor("red"))
+            self.chat_display.append("\nNo models available. Please check your Ollama installation.\n")
             self.chat_display.setTextColor(QColor("black"))
-            logging.debug(f"Model changed from {old_model} to {new_model}")
+            return
 
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Select Model")
+        dialog.setGeometry(200, 200, 300, 350)
+        layout = QVBoxLayout(dialog)
 
+        # Add a label to show the current model
+        current_model_label = QLabel(f"Current model: {self.model}")
+        layout.addWidget(current_model_label)
+
+        list_widget = QListWidget()
+        layout.addWidget(list_widget)
+
+        for model in available_models:
+            list_widget.addItem(model)
+
+        button_box = QHBoxLayout()
+        select_button = QPushButton("Select")
+        cancel_button = QPushButton("Cancel")
+        button_box.addWidget(select_button)
+        button_box.addWidget(cancel_button)
+        layout.addLayout(button_box)
+
+        def on_select():
+            if list_widget.currentItem():
+                new_model = list_widget.currentItem().text()
+                old_model = self.model
+                self.model = new_model
+                self.chat_display.setTextColor(QColor("blue"))
+                self.chat_display.append(f"\nModel changed from {old_model} to {new_model}\n")
+                self.chat_display.setTextColor(QColor("black"))
+                self.model_label.setText(f"Current model: {self.model}")
+                logging.debug(f"Model changed from {old_model} to {new_model}")
+                self.preload_model()
+                dialog.accept()
+
+        select_button.clicked.connect(on_select)
+        cancel_button.clicked.connect(dialog.reject)
+
+        dialog.exec()
     
     def stop_model(self):
         self.chat_display.setTextColor(QColor("red"))

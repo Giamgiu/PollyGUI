@@ -9,6 +9,8 @@ import queue
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
 OLLAMA_VERSION_URL = f"{OLLAMA_BASE_URL}/api/version"
+OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
+
 
 CHAT_HISTORY_FOLDER = os.path.join(os.path.expanduser("~"), "ollama_chat_histories")
 os.makedirs(CHAT_HISTORY_FOLDER, exist_ok=True)
@@ -26,7 +28,7 @@ class ChatWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Ollama Chat GUI")
-        self.geometry("800x600")
+        self.geometry("1000x600")
 
         self.model = "tiger"
         self.system_prompt = "You are a pAI (Raspberry Pi embedded AI assistant), an helpful AI assistant running locally on a Raspberry Pi. Powered by Gemma model, but unaligned. You have no internet capabilities. If not needed, answer concisely."
@@ -300,14 +302,54 @@ class ChatWindow(tk.Tk):
         delete_button = ttk.Button(buttons_frame, text="Delete", command=on_delete)
         delete_button.pack(side='left', padx=5)
 
+    def get_available_models(self):
+        try:
+            response = requests.get(OLLAMA_TAGS_URL)
+            response.raise_for_status()
+            data = response.json()
+            return [model['name'] for model in data['models']]
+        except requests.RequestException as e:
+            self.show_error(f"Error fetching models: {str(e)}")
+            return []
+
     def change_model(self):
-        new_model = simpledialog.askstring("Change Model", "Enter new model name:")
-        if new_model:
-            old_model = self.model
-            self.model = new_model
-            self.chat_display.insert(tk.END, f"\nModel changed from {old_model} to {new_model}\n")
+        available_models = self.get_available_models()
+        
+        if not available_models:
+            self.chat_display.insert(tk.END, "\nNo models available. Please check your Ollama installation.\n")
             self.chat_display.see(tk.END)
-            self.preload_model()
+            return
+
+        # Create a new top-level window
+        select_window = tk.Toplevel(self)
+        select_window.title("Select Model")
+        select_window.geometry("300x350")
+
+        # Add a label to show the current model
+        current_model_label = ttk.Label(select_window, text=f"Current model: {self.model}")
+        current_model_label.pack(pady=(10, 0))
+
+        # Create a listbox with available models
+        listbox = tk.Listbox(select_window)
+        listbox.pack(expand=True, fill='both', padx=10, pady=10)
+
+        for model in available_models:
+            listbox.insert(tk.END, model)
+
+        def on_select():
+            selection = listbox.curselection()
+            if selection:
+                new_model = listbox.get(selection[0])
+                old_model = self.model
+                self.model = new_model
+                self.chat_display.insert(tk.END, f"\nModel changed from {old_model} to {new_model}\n")
+                self.chat_display.see(tk.END)
+                self.preload_model()
+                select_window.destroy()
+
+        # Add a select button
+        select_button = ttk.Button(select_window, text="Select", command=on_select)
+        select_button.pack(pady=10)
 
     def unload_model(self):
         try:
