@@ -167,9 +167,6 @@ class ChatWindow(QMainWindow):
         self.status_label = QLabel("Initializing...")
         self.statusBar().addPermanentWidget(self.status_label)
 
-        # Add a label to show the current model
-        self.model_label = QLabel(f"Current model: {self.model}")
-        self.statusBar().addPermanentWidget(self.model_label)
 
         self.thread = None
         self.worker = None
